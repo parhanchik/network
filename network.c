@@ -5,7 +5,8 @@
 #include <time.h>
 #include <stdbool.h>
 
-#define IP_MASK [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+
+
+
 
 
 /*
@@ -14,8 +15,9 @@
 */
 int input_data(uint32_t *ip, short *N){
 	FILE *fp;
-	char n_str[5], ip_str[15], *octet;
-	regex_t regex;
+	char n_str[3], ip_str[15], *octet;
+	uint8_t one_byte = 255;
+	char c;
 
 
 	//open in.txt
@@ -26,8 +28,20 @@ int input_data(uint32_t *ip, short *N){
 
 		
 	//read in.txt
-	if (!fgets(n_str, 5, fp)){
+	if (!fgets(n_str, 3, fp)){
 		printf("Error: N input err.");
+		exit(1);
+	}
+
+
+	if (fseek(fp,0,SEEK_SET)){
+		printf("Error: fseek().");
+		exit(1);
+	}
+	int numb_in_N =0;
+	while ((c = fgetc(fp))!='\n'){ numb_in_N++; }
+	if (numb_in_N > 2){
+		printf("Error: Incorrect N.");
 		exit(1);
 	}
 
@@ -36,10 +50,21 @@ int input_data(uint32_t *ip, short *N){
 		printf("Error: IP input err.");
 		exit(1);
 	}
-	
+
 
 	fclose(fp);
 
+	int iter =0;
+	c = n_str[0];
+	while (c != '\n' && c !='\0'){ 
+		
+		if (c < '1' || c > '9') {
+			printf("Error: Incorrect N");
+			exit(1);
+		}
+		iter++;
+		c = n_str[iter];
+	}
 
 
 	*N = (short)(atoi(n_str));
@@ -55,13 +80,14 @@ int input_data(uint32_t *ip, short *N){
 
 
 
-/*
+/*						TODO
+
 
 	Данный участок кода был предназначен для проверки соответствия введенного IP адреса шаблону.
 	На чистом С реализовать проверку не удалость, удалось только на С++.
 
 
-
+	regex_t regex;
 	if (regcomp(&regex, "[1-9]{1}[0-9]{0,1,2}(\.[0-9]{1,2,3}){2}\.[1-9]{1}[0-9]{0,1,2}", 0)){
 		printf("Error: N input err.");
 		exit(1);
@@ -72,15 +98,46 @@ int input_data(uint32_t *ip, short *N){
 	if( !reti ){
                printf("Match");
 	}
-       else if(reti == REG_NOMATCH ){
+        else if(reti == REG_NOMATCH ){
                printf("No match");
-       }
-       else{
+        }
+        else{
                printf("Regex match failed:\n");
                exit(1);
-       }
-	regfree(&regex);
+        }
+	 regfree(&regex);
 */       
+
+
+	// проверка IP на корректность (костыль вместо регулярки)
+	uint8_t numbs_in_octet = 0, points_count = 0;
+
+	iter = 0;
+	c = ip_str[0];
+	while (c != '\n' && c!= '\0') {
+		
+		if ((c < '0' || c > '9') && c != '.') {
+			printf("Error: Incorrect IP address1");
+			exit(1);
+		}
+		else if (c != '.')
+			numbs_in_octet ++;
+		     else if (numbs_in_octet > 3 || numbs_in_octet < 1) {
+				printf("Error: Incorrect IP address2");
+				exit(1);
+		     }
+			  else {
+				points_count ++;
+				numbs_in_octet = 0;
+			}
+	iter++;
+	c = ip_str[iter];
+	}
+
+	if (points_count != 3) {
+		printf("Error: Incorrect IP address3");
+		exit(1);
+	}
 
 
 	//парсинг прочитанной из файла ip строки
@@ -88,6 +145,14 @@ int input_data(uint32_t *ip, short *N){
 	uint32_t second_octet = (uint32_t)(atoi(octet = strtok(NULL, ".")));
 	uint32_t third_octet = (uint32_t)(atoi(octet = strtok(NULL, ".")));
 	uint32_t fourth_octet = (uint32_t)(atoi(octet = strtok(NULL, "\n")));
+
+
+	// проверка корректности ip
+	if (first_octet == 0 || fourth_octet == 0 || first_octet > 255 ||
+		second_octet > 255 || third_octet > 255 || fourth_octet > 255){
+		printf("Error: Incorrect IP address");
+		exit(1);
+	}
 
 
 	//укладываем ip по октетам в uint32_t	
@@ -135,13 +200,13 @@ int findSubnetsCount(uint32_t ip){
 
 
 
+
 /*
 	Данная функция осуществляет генерацию всех возможных подсетей для конкретного IP адреса
 	и выбирает из них случайным образом N подсетей, которые выводит в файл autogen.txt. Подсеть
 	с максимальным префиксом выводится в out.txt. 
 
 */
-
 void generateSubnets(uint32_t ip, int N, int subnets_count){
 
 
@@ -169,7 +234,6 @@ void generateSubnets(uint32_t ip, int N, int subnets_count){
 	mask <<= hosts_bits;
 	bit <<= 24;
 
-//	printf("mask = %u\n", (unsigned int)mask);
 
 	// Генерируются все возможные подсети для IP адреса
 	for (int i = 0; hosts_bits > 0, i < subnets_count; hosts_bits--, i++) {
@@ -177,31 +241,15 @@ void generateSubnets(uint32_t ip, int N, int subnets_count){
 		bit >>= 1;
 		
 		if ((ip != (ip&mask)) || flag)
-			if (flag)
-				subnet = ip  | ((uint64_t)(32-hosts_bits)<<32);
-			else
-				subnet = ((uint64_t)(ip & mask)) | ((uint64_t)(32-hosts_bits)<<32);
-		else {
-			printf("%u\n", (unsigned int)(ip&octet));
-			ip-=one; 
-			printf("%u\n", (unsigned int)(ip&octet));
-//printf("tttt\n");
-			flag = true;
-			subnet = ip  | ((uint64_t)(32-hosts_bits)<<32);
-		}
-			
+			subnet = ((uint64_t)(ip & mask)) | ((uint64_t)(32-hosts_bits)<<32);
 
-		//printf("mask = %u\n", (unsigned int)mask);
-		//printf("ip= %u.%u.%u.%u/%u\n", (unsigned int)mask);
+			
 		subnets[i] = subnet;
-		printSubnets(subnet);
 	}
 
 
-//	printf("-------Find--Subnets------\n");
 	
 	FILE *out, *autogen;
-	out = fopen("out.txt", "w");
 	autogen = fopen("autogen.txt", "w");
 
 
@@ -211,8 +259,6 @@ void generateSubnets(uint32_t ip, int N, int subnets_count){
 	{
 		uint64_t max_prefix;
 		int subnet_pos = rand() % subnets_count;
-//		printf ("%d", subnet_pos);
-//		printSubnets(subnets[subnet_pos]);
 		cur_subnet = subnets[subnet_pos];
 		fprintf(autogen, "%u.%u.%u.%u/%u\n", (unsigned int)((cur_subnet>>24)&octet), 
 				(unsigned int)((cur_subnet>>16)&octet),(unsigned int)((cur_subnet>>8)&octet),
@@ -225,7 +271,6 @@ void generateSubnets(uint32_t ip, int N, int subnets_count){
 				new_subnets_arr[k] = subnets[j];
 				k++;
 			} else {
-				//fprintf//
 				max_prefix = subnets[j]&prefix_octet;
 				if ( max_prefix > good_ip)
 					good_ip = subnets[j];
@@ -239,6 +284,7 @@ void generateSubnets(uint32_t ip, int N, int subnets_count){
 
 
 	// Вывод в файл out.txt
+	out = fopen("out.txt", "w");
 	fprintf(out, "%u.%u.%u.%u\n", (unsigned int)((ip>>24)&octet), 
 		(unsigned int)((ip>>16)&octet),(unsigned int)((ip>>8)&octet),
 		(unsigned int)(ip&octet));
@@ -263,8 +309,6 @@ int main (){
 	short N;
 	if ( input_data(&ip, &N))
      		return 1;
-	printf("ip in main = %u\n", (unsigned int)ip);
-	printf("N in main = %hd\n", N );
 	generateSubnets(ip, N, findSubnetsCount(ip));
 
 
